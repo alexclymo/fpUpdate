@@ -96,4 +96,4 @@ But for many practical applications you might want to keep your model code in th
 ## ⚙️ Requirements
 
 - MATLAB (tested with R2024b)
-- Optimization Toolbox *(optional, for `lsqlin` used in Anderson acceleration)*
+- Optimization Toolbox *(optional, for* `lsqlin` *used in Anderson acceleration)*
