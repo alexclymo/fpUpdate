@@ -78,7 +78,7 @@ But for many practical applications you might want to keep your model code in th
 
 ## 📈 Methods Currently Supported
 
-- **Fixed Point (damped)**:
+- **Fixed Point with dampening**:
     - Simple update `x_new = zeta * fx + (1 - zeta) * x`.
     - Works for contractions, possibly fails if not.
 - **Anderson Acceleration**:
