@@ -36,9 +36,9 @@ where `fx` is the value of **f(x)** evaluated at `x` (i.e. `fx = f(x)`). The str
 To use this code, the `par` structure must be created towards the top of your code. This can be done either manually or using the `fpSetup` function. For example, to set up the solver to use Anderson Acceleration, we could manually type:
 ```matlab
 par.method = 'anderson';
-parFP.Ma = 5; %number of last guesses to use in Anderson scheme
-parFP.zeta0 = 0.01; %dampening during pre-Anderson phase
-parFP.zeta1 = 1; %dampening during Anderson phase
+par.Ma = 5; %number of last guesses to use in Anderson scheme
+par.zeta0 = 0.01; %dampening during pre-Anderson phase
+par.zeta1 = 1; %dampening during Anderson phase
 ```
 Or automatically set up `par` with the default parameters using
 ```matlab
