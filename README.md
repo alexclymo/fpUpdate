@@ -85,12 +85,12 @@ But for many practical applications you might want to keep your model code in th
     - Uses history of past guesses and residuals to improve convergence. Code automatically stores history of last **Ma** guesses and and function evaluations in `par`.
     - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian.
 - **Broyden's Method (in progress!)**:
-    - Jacobian based method quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
+    - Jacobian based quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
     - Higher memory requirement than fixed point or Anderson method when **N** is large. Might be infeasible for, e.g., solving long price sequences.
     - Code automatically stores and updates inverse Jacobian in `par`.
 - **Limited-memory BFGS (L-BFGS) Method (in progress!)**
     - A limited memory version of Broyden-type methods, which only stores a partial history of function evaluations.
-    - Memory requireement therefore same as Anderson Acceleration, and might be useful in situations where **N** is large and Broyden is infeasible.
+    - Memory requirement therefore same as Anderson Acceleration, and might be useful in situations where **N** is large and Broyden is infeasible.
     - Code automatically stores history of last guesses and and function evaluations in `par`.
 
 ## ⚙️ Requirements
