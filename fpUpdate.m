@@ -55,6 +55,10 @@ function [x_new,par] = fpUpdate(x,f,par)
 %   3) add more methods: broyden, L-BFGS, ...
 
 
+% check x and f are column vectors
+if max(size(x,2),size(f,2)) > 1, error('x and f must be column vectors'), end
+
+% select method and update x to x_new
 switch par.method
     case 'fixedPoint'
         %basic fixed point iteration with dampening:
