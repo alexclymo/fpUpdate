@@ -14,7 +14,7 @@ Solving fixed point problems is a core task in many quantitative macroeconomics 
 - Embedding fixed point iterations within a broader calibration or simulation framework. E.g.
     - Wrapping a calibration loop around the solution of the steady state of your model
     - Solving for the equilibrium price sequence following an MIT shock
-- Solving for prices or parameters when putting your model into a Matlab function so you can use `fsolve` is inconvenient.
+- When putting your model into a Matlab function so you can use `fsolve` is inconvenient.
 - Testing and comparing update methods like damped iteration or Anderson acceleration.
 
 The code is not particularly sophisticated, but the idea is for it to be very practically useful. If you have an updating scheme where you currently update some vector $x$ in a loop with dampening, this can be slow. This function is meant to allow you to replace that dampened update with something more sophisticated with little to no hassle. 
