@@ -84,7 +84,7 @@ But for many practical applications you might want to keep your model code in th
     - Simple update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
     - Works for contractions, possibly fails if not. 
     - In price sequence update loops, often leads to oscillations and overshoots.
-- **Anderson Acceleration**: $x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}$
+- **Anderson Acceleration**: $`x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}`$
     - Uses history of past guesses and residuals to improve convergence. Solves a least squares problem each iteration to choose parameters $\alpha_k$ and updates `x_new` as a weighted sum of past function evaluations. See [here](https://en.wikipedia.org/wiki/Anderson_acceleration) for details.
     - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian. For example, in price sequence update loops, this extra information avoids oscillations and overshoots, and allows you to use less dampening than the simple fixed point method and so converge in fewer iterations.
     - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. Code allows for standard dampening on top of the Anderson update. 
