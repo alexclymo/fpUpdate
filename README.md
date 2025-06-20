@@ -80,7 +80,7 @@ But for many practical applications you might want to keep your model code in th
 
 ## 📈 Methods Currently Supported
 
-- **Fixed Point with dampening**: $x' = \zeta \odot f(x) + (1-\zeta) \odot x$
+- **Fixed Point with dampening**: $x_{k+1} = \zeta \odot f(x_k) + (1-\zeta) \odot x_k$
     - Simple update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
     - Works for contractions, possibly fails if not. 
     - In price sequence update loops, often leads to oscillations and overshoots.
