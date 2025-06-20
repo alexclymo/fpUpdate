@@ -39,7 +39,8 @@ function [x_new,par] = fpUpdate(x,f,par)
 %   par.method - selects the method:
 %                     'fixedPoint' -> basic fixed point update (only works
 %                                     for contraction mappings) with
-%                                     dampening parameter par.zeta
+%                                     dampening parameter par.zeta which
+%                                     can be scalar or (N x 1) vector
 %                     'anderson'   -> Anderson Acceleration method. See the
 %                                     helper function below for required
 %                                     par structure and options
@@ -64,7 +65,10 @@ switch par.method
         %basic fixed point iteration with dampening:
         % x' = zeta*f(x) + (1-zeta)*x
         zeta = par.zeta;
-        x_new = zeta*f + (1-zeta)*x;
+        %check that zeta is scalar or column vector of length N
+        if ~(size(zeta,2) == 1 && (size(zeta,1) == 1 || size(zeta,1) == size(x,1))), error('zeta must be scalar or N x 1 vector'), end
+        %update x
+        x_new = zeta.*f + (1-zeta).*x;
     case 'anderson'
         %anderson acceleration
         [x_new,par] = AndersonUpdate(x,f,par);
@@ -88,8 +92,9 @@ function [x_new,par] = AndersonUpdate(x,f,par)
 %   par - structure containing algorithm pars and past guesses/evaluations
 %      .Ma = m+1 - number of past guesses to use (must be >=2)
 %                  if Ma < 2 then do simple dampening with zeta0
-%      .zeta0    - dampening when not using Anderson because M < Ma
-%      .zeta1    - dampening when using Anderson
+%      .zeta0    - dampening when not using Anderson because M < Ma (can be
+%                  scalar or (N x 1) vector)
+%      .zeta1    - dampening when using Anderson (can be scalar or (N x 1) vector)
 %                  x_new = zeta*x_new + (1-zeta)*x_hist(:,end)
 %      .x_hist   - [N x ?] matrix of past guesses (initialise as  = [])
 %      .f_hist   - [N x ?] matrix of f(x) evaluations at those guesses (initialise as  = [])
@@ -132,12 +137,15 @@ f_hist = [f_hist,f];
 %extract N and M to check x and f have same size
 [N2, M2] = size(f_hist);
 if (N2 ~= N) || (M2 ~= M), error('x and f history not coherent'), end
+%check that zeta0 and zeta1 are scalar or column vectors of length N
+if ~(size(zeta0,2) == 1 && (size(zeta0,1) == 1 || size(zeta0,1) == N)), error('zeta0 must be scalar or N x 1 vector'), end
+if ~(size(zeta1,2) == 1 && (size(zeta1,1) == 1 || size(zeta1,1) == N)), error('zeta1 must be scalar or N x 1 vector'), end
 
 if M < Ma
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % If less data than anderson columns, just take last f(x) as update
     % with dampening
-    x_new = zeta0*f_hist(:,end) + (1-zeta0)*x_hist(:,end);
+    x_new = zeta0.*f_hist(:,end) + (1-zeta0).*x_hist(:,end);
     alpha = 1; %alpha is just one
 else
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -185,7 +193,7 @@ else
     % Compute new guess: x_new = sum_i alpha_i * f(x_i)
     x_new = f_hist * alpha;
     %add dampening
-    x_new = zeta1*x_new + (1-zeta1)*x_hist(:,end);
+    x_new = zeta1.*x_new + (1-zeta1).*x_hist(:,end);
 
 end
 

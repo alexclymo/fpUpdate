@@ -80,12 +80,16 @@ But for many practical applications you might want to keep your model code in th
 
 ## 📈 Methods Currently Supported
 
-- **Fixed Point with dampening**:
+- **Fixed Point with dampening**: $x' = \zeta f(x) + (1-\zeta) x$
     - Simple update `x_new = zeta * fx + (1 - zeta) * x`.
-    - Works for contractions, possibly fails if not.
-- **Anderson Acceleration**:
-    - Uses history of past guesses and residuals to improve convergence. Code automatically stores history of last `Ma` guesses and and function evaluations in `par`.
-    - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian.
+    - Works for contractions, possibly fails if not. 
+    - In price sequence update loops, often leads to oscillations and overshoots.
+- **Anderson Acceleration**: $x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}$
+    - Uses history of past guesses and residuals to improve convergence. Solves a least squares problem each iteration to choose parameters $\alpha_k$ and updates `x_new` as a weighted sum of past function evaluations. See [here](https://en.wikipedia.org/wiki/Anderson_acceleration) for details.
+    - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian. For example, in price sequence update loops, this extra information avoids oscillations and overshoots, and allows you to use less dampening than the simple fixed point method and so converge in fewer iterations.
+    - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. Code allows for standard dampening on top of the Anderson update. 
+    - Seems typical to set `Ma` to around 5 or 10. 
+    - Convergence is not guaranteed, and after getting close to the solution quite quickly, the method might get stuck at, e.g., an error of around 1e-3. 
 - **Broyden's Method (in progress!)**:
     - Jacobian based method quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
     - Higher memory requirement than fixed point or Anderson method when $N$ is large. Might be infeasible for, e.g., solving long price sequences.
