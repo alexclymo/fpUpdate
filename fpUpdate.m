@@ -163,8 +163,6 @@ else
     method = 'lsqlin';
     switch method
         case 'lsqlin'
-            % Compute residuals: r_i = f(x_i) - x_i
-            R = f_hist - x_hist;  % [N x (m+1)]
             % lsqlin: min ||R * alpha||^2 s.t. sum(alpha) = 1
             opts = optimoptions('lsqlin','Display','none');
             Aeq = ones(1,m+1);
