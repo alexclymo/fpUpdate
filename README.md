@@ -80,8 +80,8 @@ But for many practical applications you might want to keep your model code in th
 
 ## 📈 Methods Currently Supported
 
-- **Fixed Point with dampening**: $x' = \zeta f(x) + (1-\zeta) x$
-    - Simple update `x_new = zeta * fx + (1 - zeta) * x`.
+- **Fixed Point with dampening**: $x' = \zeta \cdot f(x) + (1-\zeta) \cdot x$
+    - Simple update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
     - Works for contractions, possibly fails if not. 
     - In price sequence update loops, often leads to oscillations and overshoots.
 - **Anderson Acceleration**: $x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}$
