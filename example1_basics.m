@@ -14,7 +14,7 @@ close all
 clc
 
 %choose test function from list
-testfun = 1
+testfun = 3
 
 % choose method and set up par structure with default parameters
 method = 'anderson' %'anderson' or 'fixedPoint'
@@ -37,7 +37,7 @@ switch testfun
         % define f(x) function
         A = magic(N);
         b = (1:N)';
-        f = @(x) (1:N)' + 2*x.^0.9 + 1000./max(1,sum((x.^2)'.*x,2));
+        f = @(x) 100 + (1:N)' + 2*x.^0.5 + 1000./max(1,sum((x.^2)'.*x,2));
     otherwise
         error('invalid test function choice')
 end
@@ -107,8 +107,8 @@ if diff > tol
     error('fpUpdate algorithm failed to converge')
 end
 
-%time in algorithm
-toc
+%time in fpUpdate algorithm
+time_in_fpUpdate = toc
 
 %number of iterations to reach convergence
 iter
@@ -120,9 +120,13 @@ iter
 %save fpUpdate solution for comparison
 x_fpUpdate = x;
 
+tic 
 %attempt to solve problem using fsolve: g(x) = f(x) - x = 0
 opts = optimoptions('fsolve','Display','off');
 [x_fsolve,fval,exf] = fsolve(@(x) f(x) - x,x0,opts);
+
+%time in fsolve algorithm
+time_in_fsolve = toc
 
 %compare fsolve and fpUpdate solutions, if fsolve converged
 if exf < 1

@@ -76,7 +76,7 @@ while diff > tol
 end
 ```
 As stated above, this code is particularly useful when you do not want to put the $f(x)$ function into a Matlab function. If you are happy to save your problem into a function `f` so that `fx = f(x);` you are probably better off doing so and sending the function to `fsolve`. 
-But for many practical applications you might want to keep your model code in the same script as the update step (at least during code development). In this case, `fpUpdate` might be useful.
+But for many practical applications you might want to keep your model code in the same script as the update step (at least during code development). In this case, `fpUpdate` might be useful, and can be faster than running `fsolve` out of the box on a function with thousands of variables (such as a price sequence).
 
 ## 📈 Methods Currently Supported
 
