@@ -58,10 +58,18 @@ switch method
         parFP.Ma = 5; %number of last guesses to use in Anderson
         parFP.zeta0 = 0.01; %dampening during pre-Anderson phase
         parFP.zeta1 = 1; %dampening during Anderson phase
+        parFP.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
     case 'fixedPoint'
         parFP.zeta = 1;
     otherwise
         error('invalid fixed point method')
+end
+
+% impose bounds on x if needed, depending on test function choice
+switch testfun
+    case 3 % a random N dimension function I wrote
+        parFP.xmin = 0;
+        
 end
 
 

@@ -31,6 +31,11 @@ switch method
         par.Ma = 5; %number of last guesses to use in Anderson
         par.zeta0 = 0.01; %dampening during pre-Anderson phase
         par.zeta1 = 1; %dampening during Anderson phase
+        par.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
     otherwise
         error('invalid fixed point method')
 end
+
+% no bounds on x by default
+par.xmin = -Inf;
+par.xmax = Inf;

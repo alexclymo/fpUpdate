@@ -6,7 +6,7 @@ function [x_new,par] = fpUpdate(x,f,par)
 %
 % Fixed point solver for x = f(x) where x is (N x 1) vector. Problems of
 % the form g(x) = 0 can also be solved by transforming to x = g(x) + x and
-% so setting f(x) = g(x) + x. 
+% so setting f(x) = g(x) + x.
 % fpUpdate performs one step, giving a new guess x_new given current guess
 % x and function value f=f(x), using various methods. The idea is that this
 % function is useful for several reasons:
@@ -22,19 +22,19 @@ function [x_new,par] = fpUpdate(x,f,par)
 %      your main code. Basic fixed point updates (x' = f(x)) can be slow or
 %      unstable and need dampening. This code allows you to test faster
 %      methods that use approximations of the Jacobian with no extra work,
-%      and without changing your code at all. 
+%      and without changing your code at all.
 %   3) The function deals with the creation and storage of past guesses and
 %      evaluations in the par structure for methods that use them (e.g.
 %      Anderson Acceleration or Broyden's method)
 %   4) This is best suited to situations where the computation of f(x)
 %      takes a non-trivial amount of time. Then the extra time spent on the
 %      updating steps in fpUpdate for more complex methods are more than
-%      offset by the savings from converging in fewer iterations. 
+%      offset by the savings from converging in fewer iterations.
 %
 % Inputs:
 %   x          - current x guess (N x 1)
 %   f          - current f(x) value (N x 1)
-%   par        - structure containing algorithm choice, parameters and past 
+%   par        - structure containing algorithm choice, parameters and past
 %                guesses/evaluations
 %   par.method - selects the method:
 %                     'fixedPoint' -> basic fixed point update (only works
@@ -44,6 +44,8 @@ function [x_new,par] = fpUpdate(x,f,par)
 %                     'anderson'   -> Anderson Acceleration method. See the
 %                                     helper function below for required
 %                                     par structure and options
+%   par.xmin   - minimum value for x imposed post updated (scalar or Nx1 vector)
+%   par.xmax   - maximum value for x imposed post updated (scalar or Nx1 vector)
 %
 % Outputs:
 %   x_new - updated x guess (N x 1)
@@ -58,6 +60,11 @@ function [x_new,par] = fpUpdate(x,f,par)
 
 % check x and f are column vectors
 if max(size(x,2),size(f,2)) > 1, error('x and f must be column vectors'), end
+
+% check no NaN, imaginary, or Inf values in x and f 
+if max(isnan([x;f])), error('NaN values in x or f'), end
+if any(abs([x;f])==Inf), error('Inf or -Inf values in x or f'), end
+if max(abs(imag([x;f])))>0, error('Imaginary values in x or f'), end
 
 % select method and update x to x_new
 switch par.method
@@ -75,6 +82,10 @@ switch par.method
     otherwise
         error('invalid fixed point method')
 end
+
+% impose max and min bounds
+x_new = max(x_new,par.xmin);
+x_new = min(x_new,par.xmax);
 
 end
 
@@ -96,6 +107,10 @@ function [x_new,par] = AndersonUpdate(x,f,par)
 %                  scalar or (N x 1) vector)
 %      .zeta1    - dampening when using Anderson (can be scalar or (N x 1) vector)
 %                  x_new = zeta*x_new + (1-zeta)*x_hist(:,end)
+%      .maxCondR - maximum condition number of residual maxtrix R before impose
+%                  regularisation. if cond(R) > maxCondR then
+%                  regularisation term lambda^2 is added to regression so
+%                  that the condition number is fixed at maxCondR
 %      .x_hist   - [N x ?] matrix of past guesses (initialise as  = [])
 %      .f_hist   - [N x ?] matrix of f(x) evaluations at those guesses (initialise as  = [])
 
@@ -112,6 +127,7 @@ function [x_new,par] = AndersonUpdate(x,f,par)
 Ma = par.Ma;
 zeta0 = par.zeta0;
 zeta1 = par.zeta1;
+maxCondR = par.maxCondR;
 m = Ma - 1; %m parameter: past guesses index i=0,1,...,m
 
 % extract x and f histories, or create empty [] if not yet created
@@ -142,13 +158,15 @@ if ~(size(zeta0,2) == 1 && (size(zeta0,1) == 1 || size(zeta0,1) == N)), error('z
 if ~(size(zeta1,2) == 1 && (size(zeta1,1) == 1 || size(zeta1,1) == N)), error('zeta1 must be scalar or N x 1 vector'), end
 
 if M < Ma
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % If less data than anderson columns, just take last f(x) as update
     % with dampening
     x_new = zeta0.*f_hist(:,end) + (1-zeta0).*x_hist(:,end);
     alpha = 1; %alpha is just one
+    lambda = 0;
+    condR = [];
 else
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Otherwise do Anderson Acceleration update
 
     %shrink history to just last Ma values
@@ -158,35 +176,58 @@ else
     % Compute residuals: r_i = f(x_i) - x_i
     R = f_hist - x_hist;  % [N x (m+1)]
 
-    %choose solver method: 'lsqlin' if have optimisation toolbox, if not
-    %then use kkt
-    method = 'lsqlin';
-    switch method
-        case 'lsqlin'
-            % lsqlin: min ||R * alpha||^2 s.t. sum(alpha) = 1
-            opts = optimoptions('lsqlin','Display','none');
-            Aeq = ones(1,m+1);
-            beq = 1;
-            alpha = lsqlin(R,zeros(N,1),[],[],Aeq,beq,[],[],[],opts);
-        case 'kkt'
-            % Center residuals by subtracting the last one
-            % (optional, but helps numerical stability)
-            r_ref = R(:, end);           % r_k
-            dR = R(:, 1:end-1) - r_ref;  % [N x m], differences w.r.t. r_k
-            % Solve constrained least squares: min ||dR * gamma + r_ref||^2 s.t. sum(gamma) = 1
-            % Set up system to solve: [dR, ones(N,1)] * [gamma; lambda] = -r_ref
-            % Or use KKT system as:
-            G = dR' * dR;              % [m x m]
-            c = dR' * r_ref;           % [m x 1]
-            % KKT system for constraint sum(alpha) = 1
-            A = [G, ones(m,1);
-                ones(1,m), 0];
-            b = -[c; 1];
-            sol = A\b;
-            gamma = sol(1:m);
-            % Construct alpha vector (length m+1)
-            alpha = [gamma; 1 - sum(gamma)];
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Set up conditioning of R'R matrix
+
+
+    % Singular values of R from largest to smallest
+    s = svd(R);
+    % Condition number (ratio svals(1) / svals(end) alternatively, condR = cond(R))
+    condR = s(1)/s(end);
+    
+    % Regularisation: Use parameter lambda to improve conditioning of the least
+    % squares problem. In the standard least squares problem, lambda changes
+    % the solution from alpha = (R'R)\(R'b) to alpha = (R'R + lambda^2*I)\(R'b)
+    % to increasing the conditioning of (R'R + lambda^2*I). We impose a maximum
+    % condition number on (R'R + lambda^2*I), where the condition number of R'R
+    % is equal to cond(R)^2.
+    %condRR = condR^2;
+    maxCondRR = maxCondR^2;
+    % choose lambda to st cond = maxCondRR, or lambda = 0 if condR < max
+    lambda = sqrt( max(s(1)^2 - maxCondRR * s(end)^2,0)/(maxCondRR-1) );
+    
+    % CHECK: below is condition number of R'R and regularised matrix
+    %cond(R'*R)
+    %cond(R'*R + lambda^2*eye(size(f_hist,2)))
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Run lsqlin to get alpha vector
+
+    if maxCondR > 1 % standard case with some max cond (could be infinite)
+        % lsqlin: min ||R * alpha||^2 + lambda^2 ||alpha||^2 s.t. sum(alpha) = 1
+        opts = optimoptions('lsqlin','Display','none');
+        % constraint sum(alpha) = 1
+        Aeq = ones(1,m+1);
+        beq = 1;
+        % Augment R and RHS for Tikhonov regularization
+        R_aug = [R; lambda * eye(m+1)];
+        rhs_aug = [zeros(size(R,1),1); zeros(m+1,1)];
+        % run lsqlin to get alpha
+        R_aug
+        lambda
+        R
+        alpha = lsqlin(R_aug,rhs_aug,[],[],Aeq,beq,[],[],[],opts);
+        % OLD: version without regularisation
+        %alpha = lsqlin(R,zeros(N,1),[],[],Aeq,beq,[],[],[],opts);
+    else %if maxConR < 1 then tells code to turn of Anderson and just do equal weights alpha = 1/Ma
+        alpha = ones(Ma,1)/Ma;
     end
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Update to x_new with dampening
 
     % Compute new guess: x_new = sum_i alpha_i * f(x_i)
     x_new = f_hist * alpha;
@@ -200,8 +241,10 @@ end
 % Update par structure
 
 par.alpha = alpha;
+par.lambda = lambda;
 par.x_hist = x_hist;
 par.f_hist = f_hist;
+par.condR = condR;
 
 
 end

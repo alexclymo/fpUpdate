@@ -1,4 +1,4 @@
-# Fixed Point Guess Updater in MATLAB
+# Fixed Point Updater in MATLAB
 
 **Author:** Alex Clymo  
 **Date:** 18 June 2025
@@ -103,3 +103,44 @@ But for many practical applications you might want to keep your model code in th
 
 - MATLAB (tested with R2024b)
 - Optimization Toolbox (optional, for* `lsqlin` *used in Anderson acceleration)
+
+
+
+## 💡 Regularisation in Anderson Acceleration
+
+When the residual history matrix $`R`$ in Anderson Acceleration becomes ill-conditioned, the least squares step can become numerically unstable. This happens as we approach the solution, and all the columns of $R$ become very similar, amplifying the role of any noise in the calculation of the $\alpha$ weights. To improve stability, we apply **Tikhonov regularisation** (ridge regression) to the Anderson step.
+
+### Regularised Anderson Problem
+
+We solve the following constrained optimisation problem:
+
+$$\min_\alpha ||R \alpha||^2 + \lambda^2 ||\alpha||^2 
+\text{ subject to } \sum_i \alpha_i = 1$$
+
+The addition of the $\lambda^2 ||\alpha||^2$ term stabilises the solution when columns of $`R`$ are nearly linearly dependent. When $\lambda=0$ this returns to the standard problem, and when $\lambda\rightarrow\infty$ the solution approaches equal weights ($\alpha = (1,1,...,1)/\text{length}(\alpha)$).
+
+At iteration $k$, with the solved $\alpha_k$ vector in hand, the Anderson method updates to the next guess $x_{k+1}$ using the formula
+
+$$x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}$$
+
+---
+
+### Condition Number of the Regularised Matrix
+
+Let $`\sigma_1 \geq \dots \geq \sigma_n`$ be the singular values of $`R`$. The condition number of the matrix $`R'R + \lambda^2 I`$ is:
+
+$$\kappa = (\sigma_1^2 + \lambda^2) / (\sigma_n^2 + \lambda^2)$$
+
+- The condition number of a matrix equals 1 if it is perfectly conditioned, and approaches infinity the columns become perfectly collinear.
+- The condition number of $R'R$ is equal to the condition number of $R$ squared.
+- As $`\lambda \to 0`$, this approaches the (squared) condition number of $`R`$. As $`\lambda \to \infty`$, $`\kappa \to 1`$.
+
+---
+
+### Choosing \lambda to Target a Desired Condition Number
+
+To choose $`\lambda`$ such that the condition number of the regularised matrix equals a target value $`\kappa_{\text{target}}`$, use:
+
+$$\lambda^2 = (\sigma_1^2 - \kappa_{\text{target}} \cdot \sigma_n^2) / (\kappa_{\text{target}} - 1)$$
+
+We impose a maximum value of the condition number of $R$ we will tolerate, `par.maxCondR`. If $R$ is worse conditioned than this, then $\lambda$ is chosen according to the above formula. If not, then $\lambda=0$ and no regularisation is applied. 
