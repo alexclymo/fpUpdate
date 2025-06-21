@@ -215,9 +215,6 @@ else
         R_aug = [R; lambda * eye(m+1)];
         rhs_aug = [zeros(size(R,1),1); zeros(m+1,1)];
         % run lsqlin to get alpha
-        R_aug
-        lambda
-        R
         alpha = lsqlin(R_aug,rhs_aug,[],[],Aeq,beq,[],[],[],opts);
         % OLD: version without regularisation
         %alpha = lsqlin(R,zeros(N,1),[],[],Aeq,beq,[],[],[],opts);
