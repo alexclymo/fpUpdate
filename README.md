@@ -3,7 +3,9 @@
 **Author:** Alex Clymo  
 **Date:** 18 June 2025
 
-This repository provides a flexible and modular toolkit for solving fixed point problems of the form $x = f(x)$ in MATLAB, where $x$ is a column vector of length $N$. It can also be applied to solving nonlinear equations of the form $g(x) = 0$ by simply defining $f(x) = g(x) + x$. It includes a generic solver wrapper `fpUpdate`, setup utility `fpSetup`, and an example script demonstrating their usage.
+This repository provides a flexible and modular toolkit for solving fixed point problems of the form $x = f(x)$ in MATLAB, where $x$ is a column vector of length $N$. The methods are all iterative, using the current guess $`x_k`$ and evaluation $`f(x_k)`$ to build the new guess $`x_{k+1}`$, allowing the code to be implemented in a simple loop. Additionally, certain methods automatically store a history of past guesses and evaluations in order to accelerate convergence by, for example, approximating the Jacobian. 
+
+It can also be applied to solving nonlinear equations of the form $g(x) = 0$ by simply adding $x$ or $-x$ to both sides and therefore defining $f(x) = x + g(x)$ or $f(x) = x - g(x)$. For Jacobian based methods, either definition is fine, while for the basic dampened fixed point update which version you choose matters.
 
 > 🚧 **Warning!** This code is very much in early development. I put it online at this early stage to encourage myself to start using Github. Please use with caution, and comments are always welcome. 
 
