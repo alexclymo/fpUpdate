@@ -91,7 +91,7 @@ But for many practical applications you might want to keep your model code in th
     - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian. For example, in price sequence update loops, this extra information avoids oscillations and overshoots, and allows you to use less dampening than the simple fixed point method and so converge in fewer iterations.
     - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. Code allows for standard dampening on top of the Anderson update. 
     - Seems typical to set `Ma` to around 5 or 10. 
-    - Convergence is not guaranteed, and after getting close to the solution quite quickly, the method might get stuck at, e.g., an error of around 1e-3. 
+    - Convergence is not guaranteed. When the function has some noise (e.g. an approximated economic model) after getting close to the solution quite quickly with relatively little dampening, the method might get stuck and oscillate around a low error, e.g. of say 1e-3. At this point, increasing the dampening seems to help.
 - **Broyden's Method (in progress!)**:
     - Jacobian based method quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
     - Higher memory requirement than fixed point or Anderson method when $N$ is large. Might be infeasible for, e.g., solving long price sequences.
