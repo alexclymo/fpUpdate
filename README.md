@@ -3,7 +3,7 @@
 **Author:** Alex Clymo  
 **Date:** 18 June 2025
 
-This repository provides a flexible and modular toolkit for solving fixed point problems of the form $x = f(x)$ in MATLAB, where $x$ is a column vector of length $N$. The methods are all iterative, using the current guess $`x_k`$ and evaluation $`f(x_k)`$ to build the new guess $`x_{k+1}`$, allowing the code to be implemented in a simple loop. Additionally, certain methods automatically store a history of past guesses and evaluations in order to accelerate convergence by, for example, approximating the Jacobian. 
+This repository provides a flexible and modular toolkit for solving fixed point problems of the form $x = f(x)$ in MATLAB, where $x$ is a column vector of length $N$. The methods are all iterative, using the current guess $`x_k`$ and evaluation $`f(x_k)`$ to build the new guess $`x_{k+1}`$, allowing the code to be implemented in a simple loop. The code implements adaptive dampening, and certain methods automatically store a history of past guesses and evaluations in order to accelerate convergence by, for example, approximating the Jacobian. 
 
 It can also be applied to solving nonlinear equations of the form $g(x) = 0$ by simply adding $x$ or $-x$ to both sides and therefore defining $f(x) = x + g(x)$ or $f(x) = x - g(x)$. For Jacobian based methods, either definition is fine, while for the basic dampened fixed point update which version you choose matters.
 
@@ -16,7 +16,7 @@ Solving fixed point problems is a core task in many quantitative macroeconomics 
 - Embedding fixed point iterations within a broader calibration or simulation framework. E.g.
     - Wrapping a calibration loop around the solution of the steady state of your model
     - Solving for the equilibrium price sequence following an MIT shock
-- When putting your model into a Matlab function so you can use `fsolve` is inconvenient.
+- When putting your model into a Matlab function to use `fsolve` is inconvenient.
 - Testing and comparing update methods like damped iteration or Anderson acceleration.
 
 The code is not particularly sophisticated, but the idea is for it to be very practically useful. If you have an updating scheme where you currently update some vector $x$ in a loop with dampening, this can be slow. This function is meant to allow you to replace that dampened update with something more sophisticated with little to no hassle. 
@@ -37,18 +37,11 @@ The core use is to update a guess `x` to a new guess `x_new` using the function 
 ```
 where `fx` is the value of $f(x)$ evaluated at `x` (i.e. `fx = f(x)`). The structure `par` defines the update method, contains the method's options, and automatically stores and updates any past function evaluation values or data needed to perform the method. Note that `par` is updated with new data as part of the function's output.
 
-To use this code, the `par` structure must be created towards the top of your code. This can be done either manually or using the `fpSetup` function. For example, to set up the solver to use Anderson Acceleration, we could manually type:
-```matlab
-par.method = 'anderson';
-par.Ma = 5; %number of last guesses to use in Anderson scheme
-par.zeta0 = 0.01; %dampening during pre-Anderson phase
-par.zeta1 = 1; %dampening during Anderson phase
-```
-Or automatically set up `par` with the default parameters using
+To use this code, the `par` structure must be created towards the top of your code. This is done using the `fpSetup` function. For example, to set up the solver to use Anderson Acceleration, we automatically set up `par` with the default parameters using
 ```matlab
 par = fpSetup('anderson');
 ```
-The parameters can then be manually edited if desired.
+The parameters can then be manually edited if desired by editing the `par` structure. 
 
 To use the solver, it is then placed into a standard `while` loop where we update `x` until convergence:
 ```matlab
@@ -81,6 +74,8 @@ As stated above, this code is particularly useful when you do not want to put th
 But for many practical applications you might want to keep your model code in the same script as the update step (at least during code development). In this case, `fpUpdate` might be useful, and can be faster than running `fsolve` out of the box on a function with thousands of variables (such as a price sequence).
 
 ## 📈 Methods Currently Supported
+
+All methods optionally implement adaptive dampening, where the dampening parameter `zeta` is lowered (raised) if the error is rising (falling).
 
 - **Fixed Point with dampening**: $x_{k+1} = \zeta \odot f(x_k) + (1-\zeta) \odot x_k$
     - Simple update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
