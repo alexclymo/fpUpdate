@@ -57,10 +57,10 @@ switch method
     case 'anderson'
         parFP.Ma = 5; %number of last guesses to use in Anderson
         parFP.zeta0 = 0.01; %dampening during pre-Anderson phase
-        parFP.zeta1 = 1; %dampening during Anderson phase
+        parFP.zeta = 0.5; %dampening during Anderson phase
         parFP.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
     case 'fixedPoint'
-        parFP.zeta = 1;
+        parFP.zeta = 0.5;
     otherwise
         error('invalid fixed point method')
 end
@@ -115,11 +115,31 @@ if diff > tol
     error('fpUpdate algorithm failed to converge')
 end
 
+%number of iterations to reach convergence
+iter
+
 %time in fpUpdate algorithm
 time_in_fpUpdate = toc
 
-%number of iterations to reach convergence
-iter
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plot diff and dampening across iterations
+
+xPlot = (1:parFP.iterData.iter);
+
+MM = 1; NN = 2;
+
+subplot(MM,NN,1)
+plot(xPlot,parFP.iterData.rmseList)
+xlabel('iteration')
+title('RMSE')
+grid on
+
+subplot(MM,NN,2)
+plot(xPlot,parFP.iterData.zetaList)
+xlabel('iteration')
+title('Dampening')
+grid on
 
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

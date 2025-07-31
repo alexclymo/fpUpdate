@@ -53,9 +53,7 @@ function [x_new,par] = fpUpdate(x,f,par)
 %
 %
 % To do list:
-%   1) further testing
-%   2) test kkt option for anderson (add conditioning?)
-%   3) add more methods: broyden, L-BFGS, ...
+%   1) add more methods: broyden, L-BFGS, ...
 
 
 % check x and f are column vectors
@@ -65,6 +63,44 @@ if max(size(x,2),size(f,2)) > 1, error('x and f must be column vectors'), end
 if max(isnan([x;f])), error('NaN values in x or f'), end
 if any(abs([x;f])==Inf), error('Inf or -Inf values in x or f'), end
 if max(abs(imag([x;f])))>0, error('Imaginary values in x or f'), end
+
+% increment iteration counter
+par.iterData.iter = par.iterData.iter + 1;
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Adaptive dampening: update zeta based on change in error
+
+% compute root mean squared error in x = f(x) at current x
+err = sqrt((f-x)'*(f-x)/length(x));
+
+% pause adaptive dampening if 1) first iteration (since no past err) or 
+% 2) in anderson method we are in early iterations of anderson phase
+adPause = 0;
+iter = par.iterData.iter;
+if iter == 1 || (strcmp(par.method,'anderson') && iter < 2*par.Ma)
+    adPause = 1;
+end
+
+% if using adaptive dampening, update zeta
+if strcmp(par.adaptiveDampening,'on') && ~adPause
+    if err < par.iterData.rmseList(end) %if errors shrinking, raise zeta
+        par.zeta = par.zeta .* par.adSettings.growFactor;
+    else %if errors growing, shrink zeta
+        par.zeta = par.zeta .* par.adSettings.shrinkFactor;
+    end
+    % impose min and max zeta values
+    par.zeta = min(max(par.zeta,par.adSettings.zetaMin),par.adSettings.zetaMax);
+end
+
+% add to list of zetas at each iteration
+par.iterData.zetaList = [par.iterData.zetaList,par.zeta];
+% add current error to list of errors at each iteration
+par.iterData.rmseList = [par.iterData.rmseList,err];
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Perform x update
 
 % select method and update x to x_new
 switch par.method
@@ -84,13 +120,12 @@ switch par.method
 end
 
 % impose max and min bounds
-x_new = max(x_new,par.xmin);
-x_new = min(x_new,par.xmax);
+x_new = max(min(x_new,par.xmax),par.xmin);
 
 end
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Anderson Acceleration helper function
 
 function [x_new,par] = AndersonUpdate(x,f,par)
@@ -105,7 +140,7 @@ function [x_new,par] = AndersonUpdate(x,f,par)
 %                  if Ma < 2 then do simple dampening with zeta0
 %      .zeta0    - dampening when not using Anderson because M < Ma (can be
 %                  scalar or (N x 1) vector)
-%      .zeta1    - dampening when using Anderson (can be scalar or (N x 1) vector)
+%      .zeta    - dampening when using Anderson (can be scalar or (N x 1) vector)
 %                  x_new = zeta*x_new + (1-zeta)*x_hist(:,end)
 %      .maxCondR - maximum condition number of residual maxtrix R before impose
 %                  regularisation. if cond(R) > maxCondR then
@@ -126,7 +161,7 @@ function [x_new,par] = AndersonUpdate(x,f,par)
 %unpack structure
 Ma = par.Ma;
 zeta0 = par.zeta0;
-zeta1 = par.zeta1;
+zeta = par.zeta;
 maxCondR = par.maxCondR;
 m = Ma - 1; %m parameter: past guesses index i=0,1,...,m
 
@@ -153,9 +188,9 @@ f_hist = [f_hist,f];
 %extract N and M to check x and f have same size
 [N2, M2] = size(f_hist);
 if (N2 ~= N) || (M2 ~= M), error('x and f history not coherent'), end
-%check that zeta0 and zeta1 are scalar or column vectors of length N
+%check that zeta0 and zeta are scalar or column vectors of length N
 if ~(size(zeta0,2) == 1 && (size(zeta0,1) == 1 || size(zeta0,1) == N)), error('zeta0 must be scalar or N x 1 vector'), end
-if ~(size(zeta1,2) == 1 && (size(zeta1,1) == 1 || size(zeta1,1) == N)), error('zeta1 must be scalar or N x 1 vector'), end
+if ~(size(zeta,2) == 1 && (size(zeta,1) == 1 || size(zeta,1) == N)), error('zeta must be scalar or N x 1 vector'), end
 
 if M < Ma
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -179,7 +214,6 @@ else
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Set up conditioning of R'R matrix
-
 
     % Singular values of R from largest to smallest
     s = svd(R);
@@ -218,7 +252,7 @@ else
         alpha = lsqlin(R_aug,rhs_aug,[],[],Aeq,beq,[],[],[],opts);
         % OLD: version without regularisation
         %alpha = lsqlin(R,zeros(N,1),[],[],Aeq,beq,[],[],[],opts);
-    else %if maxConR < 1 then tells code to turn of Anderson and just do equal weights alpha = 1/Ma
+    else %if maxCondR < 1 then tells code to turn of Anderson and just do equal weights alpha = 1/Ma
         alpha = ones(Ma,1)/Ma;
     end
 
@@ -229,7 +263,7 @@ else
     % Compute new guess: x_new = sum_i alpha_i * f(x_i)
     x_new = f_hist * alpha;
     %add dampening
-    x_new = zeta1.*x_new + (1-zeta1).*x_hist(:,end);
+    x_new = zeta.*x_new + (1-zeta).*x_hist(:,end);
 
 end
 
