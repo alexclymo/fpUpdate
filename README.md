@@ -25,7 +25,7 @@ The code is not particularly sophisticated, but the idea is for it to be very pr
 
 | File               | Description |
 |--------------------|-------------|
-| `fpUpdate.m`       | Core function for updating the guess `x` using various fixed point methods (`fixedPoint`, `anderson`). Manages internal histories needed for acceleration methods. |
+| `fpUpdate.m`       | Core function for updating the guess `x` using various fixed point methods. Manages internal histories needed for acceleration and Jacobian methods. |
 | `fpSetup.m`        | Helper function to initialize the `par` structure with default parameters for the chosen method. |
 | `example1_basics.m`| Script demonstrating how to use the fixed point solver with example functions, comparing performance of methods and validating against MATLAB’s `fsolve`. |
 
@@ -87,12 +87,13 @@ All methods optionally implement adaptive dampening, where the dampening paramet
     - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. Code allows for standard dampening on top of the Anderson update. 
     - Seems typical to set `Ma` to around 5 or 10. 
     - Convergence is not guaranteed. When the function has some noise (e.g. an approximated economic model) after getting close to the solution quite quickly with relatively little dampening, the method might get stuck and oscillate around a low error, e.g. of say 1e-3. At this point, increasing the dampening seems to help.
-- **Broyden's Method (in progress!)**:
+- **Broyden's Method**:
     - Jacobian based method quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
     - Higher memory requirement than fixed point or Anderson method when $N$ is large. Might be infeasible for, e.g., solving long price sequences.
-    - Code automatically stores and updates inverse Jacobian in `par`.
-- **Limited-memory BFGS (L-BFGS) Method (in progress!)**
-    - A limited memory version of Broyden-type methods, which only stores a partial history of function evaluations.
+    - Code automatically stores and updates inverse Jacobian in `par`. Uses Broyden's first (i.e. good) method, and works directly with inverse Jacobian. See [here](https://en.wikipedia.org/wiki/Broyden%27s_method) for details.
+    - Code includes protection against small denominator in Jacobian update, and automatically resets Jacobian if it becomes ill-conditioned.
+- **Limited-memory Broyden Method (in progress!)**
+    - A limited memory version of Broyden-type methods, which only stores a partial history of function evaluations. See [here](https://math.leidenuniv.nl/reports/files/2003-06.pdf) for details.
     - Memory requireement therefore same as Anderson Acceleration, and might be useful in situations where $N$ is large and Broyden is infeasible.
     - Code automatically stores history of last guesses and and function evaluations in `par`.
 
