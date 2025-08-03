@@ -14,10 +14,10 @@ close all
 clc
 
 %choose test function from list
-testfun = 3
+testfun = 2
 
 % choose method and set up par structure with default parameters
-method = 'anderson' %'anderson' or 'fixedPoint'
+method = 'broyden' %'anderson' or 'fixedPoint'
 
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -50,17 +50,21 @@ x0 = 0.1*ones(N, 1);
 % Choose fixed point solver scheme and set up options
 
 % choose method and set up par structure with default parameters
-parFP = fpSetup(method);
+par = fpSetup(method);
 
-% OPTIONAL: manually make changes to solver parameters by editing parFP
+% OPTIONAL: manually make changes to solver parameters by editing par
 switch method
     case 'anderson'
-        parFP.Ma = 5; %number of last guesses to use in Anderson
-        parFP.zeta0 = 0.01; %dampening during pre-Anderson phase
-        parFP.zeta = 0.5; %dampening during Anderson phase
-        parFP.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
+        par.Ma = 5; %number of last guesses to use in Anderson
+        par.zeta0 = 0.01; %dampening during pre-Anderson phase
+        par.zeta = 0.5; %dampening during Anderson phase
+        par.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
     case 'fixedPoint'
-        parFP.zeta = 0.5;
+        par.zeta = 0.5;
+    case 'broyden'
+        if testfun == 3
+            par.H0scale = -1e-3; %flip initial update direction away from 0
+        end
     otherwise
         error('invalid fixed point method')
 end
@@ -68,7 +72,7 @@ end
 % impose bounds on x if needed, depending on test function choice
 switch testfun
     case 3 % a random N dimension function I wrote
-        parFP.xmin = 0;
+        par.xmin = 0;
         
 end
 
@@ -95,7 +99,7 @@ while diff > tol && iter <= maxiter
     y = f(x);
 
     % Perform one x update to get x_new
-    [x_new,parFP] = fpUpdate(x,y,parFP);
+    [x_new,par] = fpUpdate(x,y,par);
 
     % compute percentage error (add small constant to denom to handle x=0)
     diff = max( abs( (y-x)./(1e-3+abs(x)) ) )
@@ -125,18 +129,18 @@ time_in_fpUpdate = toc
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Plot diff and dampening across iterations
 
-xPlot = (1:parFP.iterData.iter);
+xPlot = (1:par.iterData.iter);
 
 MM = 1; NN = 2;
 
 subplot(MM,NN,1)
-plot(xPlot,parFP.iterData.rmseList)
+plot(xPlot,par.iterData.rmseList)
 xlabel('iteration')
 title('RMSE')
 grid on
 
 subplot(MM,NN,2)
-plot(xPlot,parFP.iterData.zetaList)
+plot(xPlot,par.iterData.zetaList)
 xlabel('iteration')
 title('Dampening')
 grid on

@@ -44,16 +44,20 @@ function [x_new,par] = fpUpdate(x,f,par)
 %                     'anderson'   -> Anderson Acceleration method. See the
 %                                     helper function below for required
 %                                     par structure and options
+%                     'broyden'    -> Broyden method. See the helper
+%                                     function below for required par
+%                                     structure and options. 
 %   par.xmin   - minimum value for x imposed post updated (scalar or Nx1 vector)
 %   par.xmax   - maximum value for x imposed post updated (scalar or Nx1 vector)
 %
 % Outputs:
 %   x_new - updated x guess (N x 1)
-%   par   - replicated and possibly updated par structure
+%   par   - replicated and updated par structure
 %
 %
 % To do list:
-%   1) add more methods: broyden, L-BFGS, ...
+%   1) Broyden: doesn't work well hitting the xmin/xmax constraints
+%   2) add more methods: Limited Memory Broyden, ...
 
 
 % check x and f are column vectors
@@ -115,6 +119,9 @@ switch par.method
     case 'anderson'
         %anderson acceleration
         [x_new,par] = AndersonUpdate(x,f,par);
+    case 'broyden'
+        %broyden method
+        [x_new, par] = broydenUpdate(x,f,par);
     otherwise
         error('invalid fixed point method')
 end
@@ -277,5 +284,76 @@ par.x_hist = x_hist;
 par.f_hist = f_hist;
 par.condR = condR;
 
+
+end
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Broyden method helper function
+
+function [x_new, par] = broydenUpdate(x, f, par)
+% BROYDENUPDATE - Single inverse Broyden update step for solving x = f(x)
+%
+% Inputs:
+%   x   - current point (column vector)
+%   f  - current evaluated function value f(x)
+%   par - struct holding:
+%         H         - inverse Jacobian estimate (n x n)
+%         x_prev    - previous x
+%         f_prev    - previous f(x)
+%         H0scale   - scale of initial H guess: H0 = par.H0scale * eye(n)
+%         tolDenom  - minimum denom for stability [default: 1e-12]
+%         maxCondH  - max cond(H) before restart [default: 1e10]
+%
+% Outputs:
+%   x_new - updated x
+%   par   - updated structure with new H, x_prev, f_prev
+
+% Current residual: F(x) = f(x) - x
+Fx = f - x;
+
+% If first step, initialize H and par structure
+if ~isfield(par, 'H')
+    n = length(x);
+    par.H = par.H0scale*eye(n);
+    par.x_prev = x; %note: will give dx = 0 at first iteration -> denom = 0 and H update will be skipped
+    par.f_prev = f;
+end
+
+% Compute dx = x_k - x_{k-1}
+dx = x - par.x_prev;
+
+% Compute dF = F(x_k) - F(x_{k-1})
+F_prev = par.f_prev - par.x_prev;
+dF = Fx - F_prev;
+
+% Apply inverse Broyden update, as long as denom not too small
+Hy = par.H * dF;
+denom = dx' * Hy;
+if abs(denom) > par.tolDenom
+    par.H = par.H + ((dx - Hy) * (dx' * par.H)) / denom;
+else
+    if par.verbose && par.iterData.iter > 1
+        fprintf('Warning: Broyden update skipped: small denominator (%.2e)', denom);
+    end
+end
+
+% Conditioning check: reset inverse Jacobian if badly conditioned
+condH = cond(par.H);
+if condH > par.maxCondH
+    if par.verbose
+        fprintf('Warning: Resetting inverse Jacobian: cond(H) = %.2e > %.2e', condH, par.maxCondH);
+    end
+    par.H = eye(length(x));
+end
+
+% Compute next step
+x_new = x - par.zeta .*(par.H * Fx);
+
+% Store current values for next iteration
+par.x_prev = x;
+par.f_prev = f;
+par.denom = denom;
+par.condH = condH;
 
 end
