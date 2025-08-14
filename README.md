@@ -1,11 +1,10 @@
 # Fixed Point Updater in MATLAB
 
 **Author:** Alex Clymo  
-**Date:** 18 June 2025
 
-This repository provides a flexible and modular toolkit for solving fixed point problems of the form $x = f(x)$ in MATLAB, where $x$ is a column vector of length $N$. The methods are all iterative, using the current guess $`x_k`$ and evaluation $`f(x_k)`$ to build the new guess $`x_{k+1}`$, allowing the code to be implemented in a simple loop. The code implements adaptive dampening, and certain methods automatically store a history of past guesses and evaluations in order to accelerate convergence by, for example, approximating the Jacobian. 
+This repository provides a flexible and modular toolkit for solving fixed point problems of the form `x = f(x)` in MATLAB, where `x` is a column vector of length `N`. The methods are all iterative, using the current guess `x_k` and evaluation `f(x_k)` to build the new guess `x_{k+1}`, allowing the code to be implemented in a simple loop. The code implements adaptive dampening, and certain methods automatically store a history of past guesses and evaluations in order to accelerate convergence by, for example, approximating the Jacobian. 
 
-It can also be applied to solving nonlinear equations of the form $g(x) = 0$ by simply adding $x$ or $-x$ to both sides and therefore defining $f(x) = x + g(x)$ or $f(x) = x - g(x)$. For Jacobian based methods, either definition is fine, while for the basic dampened fixed point update which version you choose matters.
+It can also be applied to solving nonlinear equations of the form `g(x) = 0` by simply adding `x` or `-x` to both sides and therefore defining `f(x) = x + g(x)` or `f(x) = x - g(x)`. For Jacobian based methods, either definition is fine, while for the basic dampened fixed point update which version you choose matters.
 
 > 🚧 **Warning!** This code is very much in early development. I put it online at this early stage to encourage myself to start using Github. Please use with caution, and comments are always welcome. 
 
@@ -19,7 +18,7 @@ Solving fixed point problems is a core task in many quantitative macroeconomics 
 - When putting your model into a Matlab function to use `fsolve` is inconvenient.
 - Testing and comparing update methods like damped iteration or Anderson acceleration.
 
-The code is not particularly sophisticated, but the idea is for it to be very practically useful. If you have an updating scheme where you currently update some vector $x$ in a loop with dampening, this can be slow. This function is meant to allow you to replace that dampened update with something more sophisticated with little to no hassle. 
+The code is not particularly sophisticated, but the idea is for it to be very practically useful. If you have an updating scheme where you currently update some vector `x` in a loop with dampening, this can be slow. This function is meant to allow you to replace that dampened update with something more sophisticated with little to no hassle. 
 
 ## 📁 File Descriptions
 
@@ -35,7 +34,7 @@ The core use is to update a guess `x` to a new guess `x_new` using the function 
 ```matlab
 [x_new, par] = fpUpdate(x, fx, par);
 ```
-where `fx` is the value of $f(x)$ evaluated at `x` (i.e. `fx = f(x)`). The structure `par` defines the update method, contains the method's options, and automatically stores and updates any past function evaluation values or data needed to perform the method. Note that `par` is updated with new data as part of the function's output.
+where `fx` is the value of `f(x)` evaluated at `x` (i.e. `fx = f(x)`). The structure `par` defines the update method, contains the method's options, and automatically stores and updates any past function evaluation values or data needed to perform the method. Note that `par` is updated with new data as part of the function's output.
 
 To use this code, the `par` structure must be created towards the top of your code. This is done using the `fpSetup` function. For example, to set up the solver to use Anderson Acceleration, we automatically set up `par` with the default parameters using
 ```matlab
@@ -70,69 +69,31 @@ while diff > tol
 
 end
 ```
-As stated above, this code is particularly useful when you do not want to put the $f(x)$ function into a Matlab function. If you are happy to save your problem into a function `f` so that `fx = f(x);` you are probably better off doing so and sending the function to `fsolve`. 
+As stated above, this code is particularly useful when you do not want to put the `f(x)` function into a Matlab function. If you are happy to save your problem into a function `f` so that `fx = f(x);` you are probably better off doing so and sending the function to `fsolve`. 
 But for many practical applications you might want to keep your model code in the same script as the update step (at least during code development). In this case, `fpUpdate` might be useful, and can be faster than running `fsolve` out of the box on a function with thousands of variables (such as a price sequence).
 
 ## 📈 Methods Currently Supported
 
 All methods optionally implement adaptive dampening, where the dampening parameter `zeta` is lowered (raised) if the error is rising (falling).
 
-- **Fixed Point with dampening**: $x_{k+1} = \zeta \odot f(x_k) + (1-\zeta) \odot x_k$
+- **Fixed Point with dampening**:
     - Simple update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
     - Works for contractions, possibly fails if not. 
     - In price sequence update loops, often leads to oscillations and overshoots.
-- **Anderson Acceleration**: $`x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}`$
-    - Uses history of past guesses and residuals to improve convergence. Solves a least squares problem each iteration to choose parameters $\alpha_k$ and updates `x_new` as a weighted sum of past function evaluations. See [here](https://en.wikipedia.org/wiki/Anderson_acceleration) for details.
+- **Anderson Acceleration**:
+    - Uses history of past guesses and residuals to improve convergence. Solves a least squares problem each iteration to choose weights and updates `x_new` as a weighted sum of past function evaluations. See [here](https://en.wikipedia.org/wiki/Anderson_acceleration) for details.
     - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian. For example, in price sequence update loops, this extra information avoids oscillations and overshoots, and allows you to use less dampening than the simple fixed point method and so converge in fewer iterations.
-    - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. Code allows for standard dampening on top of the Anderson update. 
+    - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. 
     - Seems typical to set `Ma` to around 5 or 10. 
-    - Convergence is not guaranteed. When the function has some noise (e.g. an approximated economic model) after getting close to the solution quite quickly with relatively little dampening, the method might get stuck and oscillate around a low error, e.g. of say 1e-3. At this point, increasing the dampening seems to help.
 - **Broyden's Method**:
     - Jacobian based method quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
-    - Higher memory requirement than fixed point or Anderson method when $N$ is large. Might be infeasible for, e.g., solving long price sequences.
+    - Higher memory requirement than fixed point or Anderson method when `N` is large. Might be infeasible for, e.g., solving long price sequences.
     - Code automatically stores and updates inverse Jacobian in `par`. Uses Broyden's first (i.e. good) method, and works directly with inverse Jacobian. See [here](https://en.wikipedia.org/wiki/Broyden%27s_method) for details.
     - Code includes protection against small denominator in Jacobian update, and automatically resets Jacobian if it becomes ill-conditioned.
-- **Limited-memory Broyden Method (in progress!)**
-    - A limited memory version of Broyden-type methods, which only stores a partial history of function evaluations. See [here](https://math.leidenuniv.nl/reports/files/2003-06.pdf) for details.
-    - Memory requireement therefore same as Anderson Acceleration, and might be useful in situations where $N$ is large and Broyden is infeasible.
-    - Code automatically stores history of last guesses and and function evaluations in `par`.
+- **Diagonal Jacobian**
+    - Method assumed Jacobian is diagonal and simply estimates it using a finite difference approximation, comparing current evaluation to past evaluation. 
 
 ## ⚙️ Requirements
 
 - MATLAB (tested with R2024b)
 - Optimization Toolbox (optional, for `lsqlin` used in Anderson acceleration)
-
-
-
-## 💡 Regularisation in Anderson Acceleration
-
-When the residual history matrix $`R`$ in Anderson Acceleration becomes ill-conditioned, the least squares step can become numerically unstable. This happens as we approach the solution, and all the columns of $R$ become very similar, amplifying the role of any noise in the calculation of the $\alpha$ weights. To improve stability, we apply **Tikhonov regularisation** (ridge regression) to the Anderson step.
-
-### Regularised Anderson Problem
-
-We solve the following constrained optimisation problem:
-
-$$\min_\alpha ||R \alpha||^2 + \lambda^2 ||\alpha||^2 
-\text{ subject to } \sum_i \alpha_i = 1$$
-
-The addition of the $\lambda^2 ||\alpha||^2$ term stabilises the solution when columns of $`R`$ are nearly linearly dependent. When $\lambda=0$ this returns to the standard problem, and when $\lambda\rightarrow\infty$ the solution approaches equal weights ($`\alpha = (1,1,...,1)/\text{length}(\alpha)`$).
-
-At iteration $k$, with the solved $\alpha_k$ vector in hand, the Anderson method updates to the next guess $x_{k+1}$ using the formula $`x_{k+1} = \sum_{i=0}^{m} (\alpha_k)_i f_{k - m + i}`$
-
-### Condition Number of the Regularised Matrix
-
-Let $`\sigma_1 \geq \dots \geq \sigma_n`$ be the singular values of $`R`$. The condition number of the matrix $`R'R + \lambda^2 I`$ is:
-
-$$\kappa = (\sigma_1^2 + \lambda^2) / (\sigma_n^2 + \lambda^2)$$
-
-- The condition number of a matrix equals 1 if it is perfectly conditioned, and approaches infinity the columns become perfectly collinear.
-- The condition number of $R'R$ is equal to the condition number of $R$ squared.
-- As $`\lambda \to 0`$, this approaches the (squared) condition number of $`R`$. As $`\lambda \to \infty`$, $`\kappa \to 1`$.
-
-### Choosing $`\lambda`$ to Target a Desired Condition Number
-
-To choose $`\lambda`$ such that the condition number of the regularised matrix equals a target value $`\kappa_{\text{target}}`$, use:
-
-$$\lambda^2 = (\sigma_1^2 - \kappa_{\text{target}} \cdot \sigma_n^2) / (\kappa_{\text{target}} - 1)$$
-
-We impose a maximum value of the condition number of $R$ we will tolerate, `par.maxCondR`. If $R$ is worse conditioned than this, then $\lambda$ is chosen according to the above formula. If not, then $\lambda=0$ and no regularisation is applied. As `par.maxCondR` approaches infinity, regularisation is turned off. As `par.maxCondR` approaches 1, $\alpha$ is forced to be a vector of equal weights.
