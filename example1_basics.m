@@ -1,7 +1,7 @@
 % example1_basics: Script to test fpUdate function for solving x = f(x)
 %
 % Author: Alex Clymo
-% Date: 18/06/2025
+% Repository: github->alexclymo->fpUpdate
 %
 % This code solves the fixed point for a test function f(x) defined in the
 % code. Set method to anderson or fixedPoint and see that anderson finds
@@ -14,10 +14,10 @@ close all
 clc
 
 %choose test function from list
-testfun = 2
+testfun = 1
 
 % choose method and set up par structure with default parameters
-method = 'broyden' %'anderson' or 'fixedPoint'
+method = 'broyden'
 
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -25,19 +25,22 @@ method = 'broyden' %'anderson' or 'fixedPoint'
 
 %choose test function from list
 switch testfun
-    case 1 % 2D function with only off-diagonal jacobian (hard, good for testing)
+    case 1 % easy diagonal 2D function
+        N = 2;
+        f = @(x) [2+cos(x(1)); 1+sin(x(2))];
+    case 2 % 2D function with only off-diagonal jacobian (hard, good for testing)
         N = 2;
         f = @(x) [cos(x(2)); sin(x(1))];
-    case 2 % another hard 2D function, harder for anderson to converge
+    case 3 % another hard 2D function with only off-diagonal jacobian
         N = 2;
-        f = @(x) [tanh(5 * x(2)); tanh(5 * x(1))];
-    case 3 % a random N dimension function I wrote
+        f = @(x) [tanh(5 * x(2)); -tanh(5 * x(1))];
+    case 4 % a random N dimension function I wrote
         % x is N x 1 vector
         N = 1000;
         % define f(x) function
         A = magic(N);
         b = (1:N)';
-        f = @(x) 100 + (1:N)' + 2*x.^0.5 + 1000./max(1,sum((x.^2)'.*x,2));
+        f = @(x) 1000 + (1:N)' + 0.5*x + 2*x.^0.5 + 1000./max(1,sum((x.^2)'.*x,2));
     otherwise
         error('invalid test function choice')
 end
@@ -54,26 +57,31 @@ par = fpSetup(method);
 
 % OPTIONAL: manually make changes to solver parameters by editing par
 switch method
-    case 'anderson'
-        par.Ma = 5; %number of last guesses to use in Anderson
-        par.zeta0 = 0.01; %dampening during pre-Anderson phase
-        par.zeta = 0.5; %dampening during Anderson phase
-        par.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
     case 'fixedPoint'
-        par.zeta = 0.5;
+        %par.zeta = 0.5;
+    case 'anderson'
+        %par.Ma = 5; %number of last guesses to use in Anderson
+        %par.zeta0 = 0.01; %dampening during pre-Anderson phase
+        %par.zeta = 0.5; %dampening during Anderson phase
+        %par.maxCondR = 10; %maximum condition number of R before impose regularisation (ridge regression)
     case 'broyden'
-        if testfun == 3
+        if testfun == 4
             par.H0scale = -1e-3; %flip initial update direction away from 0
         end
-    otherwise
-        error('invalid fixed point method')
+        %par.zeta = 0.5;
+        %par.H0scale = 0.1; %scale of initial H guess: H0 = par.H0scale * eye(n). Smaller -> smaller initial steps. Can be <0 to flip initial direction
+        %par.tolDenom = 1e-10; %if denominator in update below this number then Jacobian update is skipped
+        %par.maxCondH = 1e10; %maximum condition number of H before reset Jacobian to identity
+    case 'jacob_diag'
+        %par.zeta = 0.5;
+        %par.zeta0 = 1e-5; %fixed dampening for first iteration
+        %par.dmin = 0.0001; %minimum derivative (keeps updates stable)
 end
 
 % impose bounds on x if needed, depending on test function choice
 switch testfun
-    case 3 % a random N dimension function I wrote
+    case 4 % a random N dimension function I wrote
         par.xmin = 0;
-        
 end
 
 
@@ -92,7 +100,7 @@ tic
 diff = 1;
 tol = 1e-5;
 iter = 1;
-maxiter = 1000;
+maxiter = 100000;
 while diff > tol && iter <= maxiter
 
     % evaluate function at new guess
@@ -155,6 +163,7 @@ x_fpUpdate = x;
 tic 
 %attempt to solve problem using fsolve: g(x) = f(x) - x = 0
 opts = optimoptions('fsolve','Display','off');
+%opts = optimoptions('fsolve','Display','off','FunctionTolerance',1e-10,'OptimalityTolerance',1e-10,'StepTolerance',1e-10);
 [x_fsolve,fval,exf] = fsolve(@(x) f(x) - x,x0,opts);
 
 %time in fsolve algorithm

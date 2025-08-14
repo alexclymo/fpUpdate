@@ -2,7 +2,7 @@ function [x_new,par] = fpUpdate(x,f,par)
 % fpUpdate: a simple fixed point solver for x = f(x)
 %
 % Author: Alex Clymo
-% Date: 18/06/2025
+% Repository: github->alexclymo->fpUpdate
 %
 % Fixed point solver for x = f(x) where x is (N x 1) vector. Problems of
 % the form g(x) = 0 can also be solved by transforming to x = g(x) + x and
@@ -46,7 +46,7 @@ function [x_new,par] = fpUpdate(x,f,par)
 %                                     par structure and options
 %                     'broyden'    -> Broyden method. See the helper
 %                                     function below for required par
-%                                     structure and options. 
+%                                     structure and options.
 %   par.xmin   - minimum value for x imposed post updated (scalar or Nx1 vector)
 %   par.xmax   - maximum value for x imposed post updated (scalar or Nx1 vector)
 %
@@ -58,12 +58,13 @@ function [x_new,par] = fpUpdate(x,f,par)
 % To do list:
 %   1) Broyden: doesn't work well hitting the xmin/xmax constraints
 %   2) add more methods: Limited Memory Broyden, ...
+%   3) add quasi line search to adaptive dampening method
 
 
 % check x and f are column vectors
 if max(size(x,2),size(f,2)) > 1, error('x and f must be column vectors'), end
 
-% check no NaN, imaginary, or Inf values in x and f 
+% check no NaN, imaginary, or Inf values in x and f
 if max(isnan([x;f])), error('NaN values in x or f'), end
 if any(abs([x;f])==Inf), error('Inf or -Inf values in x or f'), end
 if max(abs(imag([x;f])))>0, error('Imaginary values in x or f'), end
@@ -78,7 +79,7 @@ par.iterData.iter = par.iterData.iter + 1;
 % compute root mean squared error in x = f(x) at current x
 err = sqrt((f-x)'*(f-x)/length(x));
 
-% pause adaptive dampening if 1) first iteration (since no past err) or 
+% pause adaptive dampening if 1) first iteration (since no past err) or
 % 2) in anderson method we are in early iterations of anderson phase
 adPause = 0;
 iter = par.iterData.iter;
@@ -122,6 +123,11 @@ switch par.method
     case 'broyden'
         %broyden method
         [x_new, par] = broydenUpdate(x,f,par);
+    case 'jacob_diag'
+        [x_new, par] = diagJacobianUpdate(x, f, par);
+    case 'jacob_rank1'
+        %rank 1 jacobian method
+        [x_new, par] = rank1JacobianUpdate(x,f,par);
     otherwise
         error('invalid fixed point method')
 end
@@ -226,7 +232,7 @@ else
     s = svd(R);
     % Condition number (ratio svals(1) / svals(end) alternatively, condR = cond(R))
     condR = s(1)/s(end);
-    
+
     % Regularisation: Use parameter lambda to improve conditioning of the least
     % squares problem. In the standard least squares problem, lambda changes
     % the solution from alpha = (R'R)\(R'b) to alpha = (R'R + lambda^2*I)\(R'b)
@@ -237,7 +243,7 @@ else
     maxCondRR = maxCondR^2;
     % choose lambda to st cond = maxCondRR, or lambda = 0 if condR < max
     lambda = sqrt( max(s(1)^2 - maxCondRR * s(end)^2,0)/(maxCondRR-1) );
-    
+
     % CHECK: below is condition number of R'R and regularised matrix
     %cond(R'*R)
     %cond(R'*R + lambda^2*eye(size(f_hist,2)))
@@ -309,8 +315,8 @@ function [x_new, par] = broydenUpdate(x, f, par)
 %   x_new - updated x
 %   par   - updated structure with new H, x_prev, f_prev
 
-% Current residual: F(x) = f(x) - x
-Fx = f - x;
+% Current residual: g(x) = f(x) - x
+g = f - x;
 
 % If first step, initialize H and par structure
 if ~isfield(par, 'H')
@@ -323,12 +329,12 @@ end
 % Compute dx = x_k - x_{k-1}
 dx = x - par.x_prev;
 
-% Compute dF = F(x_k) - F(x_{k-1})
-F_prev = par.f_prev - par.x_prev;
-dF = Fx - F_prev;
+% Compute dg = F(x_k) - F(x_{k-1})
+g_prev = par.f_prev - par.x_prev;
+dg = g - g_prev;
 
 % Apply inverse Broyden update, as long as denom not too small
-Hy = par.H * dF;
+Hy = par.H * dg;
 denom = dx' * Hy;
 if abs(denom) > par.tolDenom
     par.H = par.H + ((dx - Hy) * (dx' * par.H)) / denom;
@@ -344,11 +350,11 @@ if condH > par.maxCondH
     if par.verbose
         fprintf('Warning: Resetting inverse Jacobian: cond(H) = %.2e > %.2e', condH, par.maxCondH);
     end
-    par.H = eye(length(x));
+    par.H = par.H0scale*eye(n);
 end
 
 % Compute next step
-x_new = x - par.zeta .*(par.H * Fx);
+x_new = x - par.zeta .*(par.H * g);
 
 % Store current values for next iteration
 par.x_prev = x;
@@ -357,3 +363,213 @@ par.denom = denom;
 par.condH = condH;
 
 end
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IN PROGRESS Diagonal Jacobian method helper function
+
+function [x_new, par] = diagJacobianUpdate(x, f, par)
+% One step of a fixed-point solver using a diagonal Jacobian approximation.
+% Assumes f is a vector-valued function and each variable is independent.
+%
+% INPUTS:
+%   x   : current guess (column vector, Nx1)
+%   f   : f(x) evaluated at current guess (Nx1)
+%   par : struct storing method state, must include:
+%         par.x_prev   = previous x
+%         par.f_prev   = previous f(x)
+%
+% OUTPUTS:
+%   x_new : updated guess
+%   par   : updated struct with new history
+
+% Compute current residual
+g = f - x;
+
+% If no history, fall back to damped fixed point update
+if ~isfield(par, 'x_prev') || isempty(par.x_prev)
+    zeta0 = par.zeta0;
+    x_new = zeta0 * f + (1 - zeta0) * x;
+    par.x_prev = x;
+    par.f_prev = f;
+    return;
+end
+
+% Compute deltas
+dx = x - par.x_prev;
+df = f - par.f_prev;
+dg = df - dx;
+
+% define finite diff derivative, avoiding division by zero
+d = dg ./ dx;
+d(dx==0) = 0; %catch NaN when dx=0
+
+% Set tolerance to avoid division by small d
+dmin = par.dmin;
+d(d>=0 & d<abs(dmin)) = abs(dmin);
+d(d<0 & d>-abs(dmin)) = -abs(dmin);
+
+% Quasi newton step
+x_new   = x - par.zeta .* g ./ d;
+
+% Update state
+par.x_prev = x;
+par.f_prev = f;
+par.d = d;
+end
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IN PROGRESS Rank 1 Jacobian method helper function
+
+function [x_new, par] = rank1JacobianUpdate(x, f, par)
+% One step of a memory-efficient rank-1 update for solving x = f(x)
+% using a secant-based quasi-Newton method.
+%
+% INPUTS:
+%   x   : current guess (column vector, Nx1)
+%   f   : f(x) evaluated at current guess (Nx1)
+%   par : struct containing method state, must include:
+%         par.x_prev   = previous x
+%         par.f_prev   = previous f(x)
+%
+% OUTPUTS:
+%   x_new : updated guess
+%   par   : updated struct with new history
+
+error('i think there is a mistake as this is not converging for testfun 1 and 3, but converging to a non-zero error')
+
+% Compute residual at current step
+g  = f - x;
+
+% If this is the first iteration, fall back to damped fixed point
+if ~isfield(par, 'x_prev') || isempty(par.x_prev)
+    zeta0 = 1e-5;
+    x_new = zeta0 * f + (1 - zeta0) * x;
+    par.x_prev = x;  %note: will give dx = 0 at first iteration -> denom = 0 and H update will be skipped
+    par.f_prev = f;
+    return;
+end
+
+% Compute secant pair
+dx = x - par.x_prev;
+df = f - par.f_prev;
+dg = df - dx;
+
+% Denominator for Sherman-Morrison formula
+dx_norm_sq = dx' * dx;
+if dx_norm_sq < 1e-12
+    dx_norm_sq = max(dx_norm_sq,1e-12);
+    % warning('Step size too small — falling back to identity update.');
+    % x_new = f;  % simple fixed point step
+    % par.x_prev = x;
+    % par.f_prev = f;
+    % return;
+end
+
+u = (dg - dx) / dx_norm_sq;
+denom = 1 + dx' * u;
+
+if abs(denom) < 1e-10
+    denom = max(denom,1e-10);
+    % warning('Denominator too small in Sherman-Morrison — falling back.');
+    % x_new = f;  % simple fixed point step
+    % par.x_prev = x;
+    % par.f_prev = f;
+    % return;
+end
+
+% Apply inverse Jacobian using Sherman-Morrison
+correction = -g + (u * (dx' * g)) / denom;
+x_new = x + par.zeta .*correction;
+
+% Update history
+par.x_prev = x;
+par.f_prev = f;
+par.denom = denom;
+par.dx_norm_sq = dx_norm_sq;
+
+end
+
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% One shot Broyden method helper function
+
+function [x_new, par] = broydenOneShot(x, f, par)
+% One-shot inverse Broyden update for solving x = f(x)
+% Uses f = f(x) as input; forms residual g = f - x internally.
+%
+% INPUTS
+%   x    : current iterate (Nx1)
+%   f    : current function value f(x) (Nx1)
+%   par  : struct with fields
+%            alpha   : scalar baseline inverse-Jacobian scale (default 1)
+%            zeta    : damping in (0,1], scales the step (default 1)
+%            x_prev  : previous iterate (optional, empty on first call)
+%            f_prev  : previous f(x)     (optional)
+%
+% OUTPUTS
+%   x_new : updated iterate
+%   par   : updated struct with stored previous iterate and function value
+%
+% Method (inverse-Broyden, one-shot per iteration):
+%   Define residual g = f - x.
+%   Build H = alpha*I + ((s - alpha*y) * y') / (y'y),
+%   where s = x - x_prev, y = (g - g_prev) = (f - f_prev) - (x - x_prev).
+%   Step:  p = -H*g  = -alpha*g - (s - alpha*y) * ((y' * g) / (y'y)).
+%   Damped update: x_new = x + zeta * p.
+%
+% Fallbacks:
+%   If no history, or y'y is tiny, use p = -alpha*g.
+
+error('needs to be tested')
+
+    % Defaults
+    if ~isfield(par, 'alpha') || isempty(par.alpha), par.alpha = 1.0; end
+    if ~isfield(par, 'zeta')  || isempty(par.zeta),  par.zeta  = 1.0; end
+
+    alpha = par.alpha;
+    zeta  = par.zeta;
+
+    % Current residual
+    g = f - x;
+
+    % If no history: scaled fixed-point/Newton-like step
+    if ~isfield(par, 'x_prev') || isempty(par.x_prev)
+        p = -alpha * g;
+        x_new = x + zeta * p;
+
+        % store history
+        par.x_prev = x;
+        par.f_prev = f;
+        return;
+    end
+
+    % Build secant pair
+    s = x - par.x_prev;           % delta x
+    df = f - par.f_prev;          % delta f
+    y = (df - s);                 % delta g = (f - x) - (f_prev - x_prev)
+
+    % Safeguards
+    denom = (y' * y);
+    if (denom < 1e-14) || (norm(s) < 1e-14)
+        % fallback to scaled fixed-point/Newton-like step
+        p = -alpha * g;
+    else
+        % One-shot inverse-Broyden step (no need to form H explicitly)
+        scalar = (y' * g) / denom;                  % (y^T g)/(y^T y)
+        correction = (s - alpha * y) * scalar;      % rank-1 piece applied to g
+        p = -alpha * g - correction;                % full step
+    end
+
+    % Damped update
+    x_new = x + zeta * p;
+
+    % Update history
+    par.x_prev = x;
+    par.f_prev = f;
+end
+
+
+
