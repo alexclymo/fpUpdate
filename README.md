@@ -4,7 +4,7 @@
 
 This repository provides a flexible and modular toolkit for solving fixed point problems of the form `x = f(x)` in MATLAB, where `x` is a column vector of length `N`. The methods are all iterative, using the current guess `x_k` and evaluation `f(x_k)` to build the new guess `x_{k+1}`, allowing the code to be implemented in a simple loop. The code implements adaptive dampening, and certain methods automatically store a history of past guesses and evaluations in order to accelerate convergence by, for example, approximating the Jacobian. 
 
-It can also be applied to solving nonlinear equations of the form `g(x) = 0` by simply adding `x` or `-x` to both sides and therefore defining `f(x) = x + g(x)` or `f(x) = x - g(x)`. For Jacobian based methods, either definition is fine, while for the basic dampened fixed point update which version you choose matters.
+It can also be applied to solving nonlinear equations of the form `g(x) = 0` by simply adding `x` to both sides and therefore defining `f(x) = x + g(x)`
 
 > 🚧 **Warning!** This code is very much in early development. I put it online at this early stage to encourage myself to start using Github. Please use with caution, and comments are always welcome. 
 
@@ -77,14 +77,13 @@ But for many practical applications you might want to keep your model code in th
 All methods optionally implement adaptive dampening, where the dampening parameter `zeta` is lowered (raised) if the error is rising (falling).
 
 - **Fixed Point with dampening**:
-    - Simple update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
-    - Works for contractions, possibly fails if not. 
+    - Simple fixed point update `x_new = zeta .* fx + (1 - zeta) .* x` where `zeta` is a dampening parameter which can be either a scalar or vector of length `N`.
+    - Works for contraction mappings, possibly fails if not. 
     - In price sequence update loops, often leads to oscillations and overshoots.
 - **Anderson Acceleration**:
-    - Uses history of past guesses and residuals to improve convergence. Solves a least squares problem each iteration to choose weights and updates `x_new` as a weighted sum of past function evaluations. See [here](https://en.wikipedia.org/wiki/Anderson_acceleration) for details.
+    - Fixed point method which uses history of past guesses and residuals to improve convergence. Solves a least squares problem each iteration to choose weights and updates `x_new` as a weighted sum of past function evaluations. See [here](https://en.wikipedia.org/wiki/Anderson_acceleration) for details.
     - Smaller memory requirement than Jacobian based methods, while still improving speed. Idea is that the partial history approximates the role of the Jacobian. For example, in price sequence update loops, this extra information avoids oscillations and overshoots, and allows you to use less dampening than the simple fixed point method and so converge in fewer iterations.
     - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. 
-    - Seems typical to set `Ma` to around 5 or 10. 
 - **Broyden's Method**:
     - Jacobian based quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
     - Higher memory requirement than fixed point or Anderson method when `N` is large. Might be infeasible for, e.g., solving long price sequences.
