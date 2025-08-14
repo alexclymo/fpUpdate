@@ -86,7 +86,7 @@ All methods optionally implement adaptive dampening, where the dampening paramet
     - Code automatically stores history of last `Ma` guesses and and function evaluations in `par`. 
     - Seems typical to set `Ma` to around 5 or 10. 
 - **Broyden's Method**:
-    - Jacobian based method quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
+    - Jacobian based quasi-Newton method: builds an approximation to the inverse Jacobian using the history of past guesses and function evaluations. 
     - Higher memory requirement than fixed point or Anderson method when `N` is large. Might be infeasible for, e.g., solving long price sequences.
     - Code automatically stores and updates inverse Jacobian in `par`. Uses Broyden's first (i.e. good) method, and works directly with inverse Jacobian. See [here](https://en.wikipedia.org/wiki/Broyden%27s_method) for details.
     - Code includes protection against small denominator in Jacobian update, and automatically resets Jacobian if it becomes ill-conditioned.
