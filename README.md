@@ -92,6 +92,10 @@ All methods optionally implement adaptive dampening, where the dampening paramet
 - **Diagonal Jacobian**
     - Method assumed Jacobian is diagonal and simply estimates it using a finite difference approximation, comparing current evaluation to past evaluation. 
 
+## 🙋‍♂️ Documentation
+
+A detailed description of code and methods is available in the [readme PDF](https://github.com/alexclymo/fpUpdate/blob/main/readme/fpUpdate_readme.pdf).
+
 ## ⚙️ Requirements
 
 - MATLAB (tested with R2024b)
